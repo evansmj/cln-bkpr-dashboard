@@ -1,6 +1,18 @@
 <script lang="ts">
+  //todo:
+  //after connecting succeeds, wait 2 sec and navigate to dashboard.   {() => goto('/dashboard')}
+
+  //move rune into same window as the address so it makes sense.
+
+  //figure out if connect state is already shared among the website, like will dashboard be connected, or do i need to export something?
+
+  //style this page later.
+
   import Lnmessage from 'lnmessage'
   import { parseNodeAddress } from './utils.js'
+  import { goto } from '$app/navigation'
+  import { LnStore } from '../stores/LnStore.js'
+  import { PublicKeyStore, RuneStore } from '../stores/NodeStore.js'
 
   let ln: Lnmessage
   let connectionStatus$: Lnmessage['connectionStatus$']
@@ -37,40 +49,38 @@
       }
     })
 
-    // initiate the connection to the remote node
-    await ln.connect()
+    LnStore.set(ln)
+
+    ln.connect()
+      .then((isConnected) => {
+        if (isConnected) {
+          PublicKeyStore.set(publicKey)
+          RuneStore.set(rune)
+          navigateToDashboard();
+        } else {
+          alert("connection error")
+        }
+      })
+      .catch((error) => {
+        console.error('An error occurred while connecting to the node:', error.message)
+      })
   }
 
-  async function request() {
-    let parsedParams: unknown | undefined
-
-    try {
-      parsedParams = params ? JSON.parse(params) : undefined
-
-      const requestResult = await ln.commando({
-        method,
-        params: parsedParams,
-        rune
-      })
-
-      result = JSON.stringify(requestResult, null, 2)
-    } catch (error) {
-      const { message } = error as { message: string }
-      alert(message)
-      return
-    }
+  function navigateToDashboard() {
+    goto('/dashboard')
   }
 </script>
 
-<main class="w-screen h-screen flex items-center justify-center p-6 relative">
+<main class="w-screen h-screen m-8">
   {#if ln}
     <div class="absolute top-1 right-1 px-2 py-1 border-green-600 rounded border text-sm">
       Browser Id: {`${ln.publicKey.slice(0, 8)}...${ln.publicKey.slice(-8)}`}
     </div>
   {/if}
 
+  <h1>Welcome to CLN Bookkeeper Dashboard</h1>
+
   <div class="w-1/2 max-w-lg">
-    <h1 class="font-bold text-3xl mb-4 w-full text-center">Create CoreLN App</h1>
     <div class="w-full mt-4 text-sm p-4 border-2 rounded border-purple-300">
       <label class="text-neutral-600 font-medium mb-1 block" for="address">Address</label>
       <textarea
@@ -79,6 +89,15 @@
         rows="3"
         bind:value={address}
         placeholder="033f4bbfcd67bd0fc858499929a3255d063999ee23f4c5e12b8b1089e132b3e408@localhost:7272"
+      />
+
+      <label class="text-neutral-600 font-medium mb-1 block" for="rune">Rune</label>
+      <textarea
+        id="rune"
+        class="border w-full p-2 rounded"
+        rows="2"
+        bind:value={rune}
+        placeholder="O2osJxV-6lGUgAf-0NllduniYbq1Zkn-45trtbx4qAE9MA=="
       />
 
       <div class="flex items-center justify-between w-full">
@@ -102,61 +121,6 @@
           </div>
         {/if}
       </div>
-    </div>
-
-    <div class="w-full mt-8 text-sm p-4 border-2 rounded border-yellow-300">
-      <label class="text-neutral-600 font-medium mb-1 block" for="rune">Rune</label>
-      <textarea
-        id="rune"
-        class="border w-full p-2 rounded"
-        rows="2"
-        bind:value={rune}
-        placeholder="O2osJxV-6lGUgAf-0NllduniYbq1Zkn-45trtbx4qAE9MA=="
-      />
-    </div>
-
-    <div class="p-4 border-2 rounded border-orange-300 mt-8">
-      <div class="w-full text-sm">
-        <label class="text-neutral-600 font-medium mb-1 block" for="method">Method</label>
-        <input
-          id="method"
-          class="border w-full p-2 rounded"
-          type="text"
-          bind:value={method}
-          placeholder="getinfo"
-        />
-      </div>
-
-      <div class="w-full mt-4 text-sm">
-        <label class="text-neutral-600 font-medium mb-1 block" for="params">Params</label>
-        <textarea
-          id="params"
-          class="border w-full p-2 rounded"
-          rows="4"
-          bind:value={params}
-          placeholder={JSON.stringify({ key: 'value' }, null, 2)}
-        />
-      </div>
-
-      <button
-        on:click={request}
-        disabled={!connectionStatus$ || !rune || !method}
-        class="mt-2 border border-purple-500 rounded py-1 px-4 disabled:opacity-20 hover:shadow-md active:shadow-none"
-        >Request</button
-      >
-    </div>
-  </div>
-
-  <div class="w-1/2 max-w-xl p-4 border-2 rounded border-green-300 ml-4">
-    <div class="w-full text-sm">
-      <label class="text-neutral-600 font-medium mb-1 block" for="params">Result</label>
-      <textarea
-        id="params"
-        class="border w-full p-2 rounded"
-        rows="20"
-        value={result || ''}
-        placeholder={JSON.stringify({ key: 'value' }, null, 2)}
-      />
     </div>
   </div>
 </main>
